@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="stylesheet" href="styles.css" />
+      <title>Register</title>
+   </head>
+   <body>
+      <div class="navBar">
+         <img src="images/srmLogo.jpg" alt="srm logo" width="130" id="srm" />
+         <h2>Date and Time</h2>
+      </div>
+      <div class="center_register">
+         <div class="boxR">
+            <h2>Registration Page</h2>
+            <form>
+               <div class="flex twoOne">
+                  <div class="labelInput textStart">
+                     <label for="firstName">First Name</label>
+                     <input type="text" id="firstName" />
+                  </div>
+                  <div class="labelInput textStart">
+                     <label for="lastName">Last Name</label>
+                     <input type="text" id="lastName" />
+                  </div>
+               </div>
+               <div class="flex twoOne">
+                  <div class="labelInput textStart">
+                     <label for="email">Email</label>
+                     <input type="email" id="email" />
+                  </div>
+                  <div class="labelInput textStart">
+                     <label for="regno">Register Number</label>
+                     <input type="text" id="regno" />
+                  </div>
+               </div>
+               <div class="flex twoOne">
+                  <div class="labelInput textStart">
+                     <label for="password">Password</label>
+                     <input type="password" id="password" />
+                  </div>
+                  <div class="labelInput textStart">
+                     <label for="confirmPassword">Confirm Password</label>
+                     <input type="password" id="confirmPassword" />
+                  </div>
+               </div>
+               <div class="flex twoOne">
+                  <div class="labelInput textStart">
+                     <label for="phone">Phone Number</label>
+                     <input type="tel" id="phone" />
+                  </div>
+                  <div class="labelInput textStart">
+                     <label for="dob">Date of Birth</label>
+                     <input type="date" id="dob" />
+                  </div>
+               </div>
+               <div class="gender textStart">
+                  <label for="gender">Gender: </label>
+                  <div class="align">
+                     <input type="radio" id="male" name="gender" value="male" />
+                     <label for="male">Male</label>
+                  </div>
+                  <div class="align">
+                     <input
+                        type="radio"
+                        id="female"
+                        name="gender"
+                        value="female"
+                     />
+                     <label for="female">Female</label>
+                  </div>
+                  <div class="align">
+                     <input
+                        type="radio"
+                        id="other"
+                        name="gender"
+                        value="other"
+                     />
+                     <label type="radio" id="other">Other</label>
+                  </div>
+               </div>
+               <!-- <div class="textStart margin">
+                  <input type="checkbox" id="terms" />
+                  <label for="terms">I agree to terms and conditions.</label>
+               </div> -->
+               <input type="submit" value="Register" class="btn" />
+
+               <div class="textStart extra">
+                  <p>
+                     Already have an account?
+                     <a href="login.html">Login here</a>
+                  </p>
+               </div>
+            </form>
+         </div>
+      </div>
+      <p class="just-footer">Made for 18CSE365J</p>
+   </body>
+</html>

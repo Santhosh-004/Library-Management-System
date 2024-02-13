@@ -1,0 +1,20 @@
+.textStart {
+   text-align: start;
+}
+
+.labelInputL {
+   display: flex;
+   flex-direction: column;
+   height: 53px;
+   justify-content: space-between;
+   margin-bottom: 20px;
+}
+
+.labelInput {
+   display: flex;
+   flex-direction: column;
+   height: 53px;
+   justify-content: space-between;
+   margin-bottom: 15px;
+   width: 46%;
+}
