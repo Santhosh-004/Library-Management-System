@@ -1,0 +1,5 @@
+queries to use:
+
+check login:
+SELECT COUNT(email) from library.Login WHERE email = 'lightj@gmail.com' AND password = 'Newworld@123';
+- if count == 1 then email and password is correct

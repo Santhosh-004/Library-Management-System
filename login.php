@@ -1,3 +1,43 @@
+<?php
+
+session_start();
+// Check if the form is submitted
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+
+      $server = "localhost";
+      $username = "root";
+      $password = "";
+      $dbname = "library";
+
+    $conn = new mysqli($server, $username, $password, $dbname);
+
+    if ($conn -> connect_error) {
+        die("Connection failed: " . $conn->connect_error);
+    }
+
+    else {
+        $email = $_POST["email"];
+        $password = $_POST["password"];
+        $fail = false;
+
+        //echo $_POST["email"] . " " . $_POST["password"];
+
+        $checkerQ = "select count(email) from Login where email = '$email' and password = '$password'";
+
+        $result = $conn -> query($checkerQ);
+
+        if ($result -> fetch_row()[0] == 1) {
+            // Redirect to the dashboard page
+            $_SESSION["email"] = $email;
+            header("Location: dashboard.php");
+            exit();
+        } else {
+            $fail = true;
+        }
+    }    
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
    <head>
@@ -37,6 +77,26 @@
                   <h4 class="m-0 p-0 fw-bold text-center">Login Page</h4>
                </div>
                <div class="card-body">
+                  <div>
+                     <?php
+                        if ($fail) {
+                           echo '<p
+                           class="text-danger text-center bg-danger-subtle border border-danger rounded-3 p-2"
+                        >
+                           Wrong Email/Password. Please try again.
+                        </p>';
+                        }
+                        if ($_SESSION["register"]) {
+                           echo '<p
+                           class="text-success text-center bg-success-subtle border border-success rounded-3 p-2"
+                        >
+                           Registration Successful. Please login.
+                        </p>';
+                        $_SESSION["register"] = false;
+                        }
+                     ?>
+                     
+                  </div>
                   <form
                      class="d-flex flex-column gap-2 align-items-center"
                      method="post"
@@ -79,3 +139,4 @@
       <p class="position-absolute w-100 text-center">Made for 18CSE365J</p>
    </body>
 </html>
+

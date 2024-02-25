@@ -1,3 +1,61 @@
+<?php
+session_start();
+
+$server = 'localhost';
+$username = 'root';
+$password = '';
+$dbname = 'library';
+
+$conn = new mysqli($server, $username, $password, $dbname);
+
+if ($conn->connect_error) {
+    die('Connection failed: ' . $conn->connect_error);
+} elseif (empty($_SESSION['email'])) {
+    header('Location: login.html');
+} else {
+    $email = $_SESSION['email'];
+    $Usql = "select * from Users where email = '$email'";
+    $Uresult = $conn->query($Usql);
+}
+
+$bookinvFlag = false;
+$editFlag = false;
+$searchFlag = false;
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (isset($_POST['search_books'])) {
+        $Sgiven = $_POST['search'];
+        $Squery = "select * from Books where lower(title) like lower('%$Sgiven%') or lower(genre) like lower('%$Sgiven%') or lower(author) like lower('%$Sgiven%') or lower(year) like lower('%$Sgiven%') limit 5";
+
+        $Sresult = $conn->query($Squery);
+        $searchFlag = true;
+
+        // echo '<script>sessionStorage.setItem("searchClicked", "true");</script>';
+    }
+
+    if (isset($_POST['book_inv'])) {
+        $Igiven = $_POST['book_search'];
+
+        $bookinvFlag = true;
+    }
+
+    if (isset($_POST['editForm'])) {
+        $title = $_POST['title'];
+        $genre = $_POST['genre'];
+        $author = $_POST['author'];
+        $year = $_POST['year'];
+        $quantity = $_POST['quantity'];
+        $id = $_POST['id'];
+
+        $Upsql = "update Books set title = '$title', genre = '$genre', author = '$author', year = '$year', quantity = '$quantity' where id = '$id'";
+        $Upresult = $conn->query($Upsql);
+
+        $editFlag = true;
+    }
+}
+
+?>
+
 <!DOCTYPE html>
 <html lang="en">
    <head>
@@ -17,6 +75,7 @@
       />
    </head>
    <body>
+
       <nav
          class="navbar bg-dark border-bottom border-body navbar-expand-lg"
          data-bs-theme="dark"
@@ -32,9 +91,10 @@
                />
                Library Management System
             </a>
-            <button class="btn btn-outline-danger btn-sm">Sign-Out</button>
+            <a href="logout.php" class="btn btn-outline-danger btn-sm" id="logout">Sign Out</a>
          </div>
       </nav>
+
       <div>
          <div class="d-flex align-items-start">
             <div
@@ -42,10 +102,10 @@
                id="v-pills-tab"
                role="tablist"
                aria-orientation="vertical"
-               style="width: 200px"
+               style="min-width: 200px"
             >
                <button
-                  class="nav-link"
+                  class="nav-link active"
                   id="v-pills-profile-tab"
                   data-bs-toggle="pill"
                   data-bs-target="#v-pills-profile"
@@ -56,44 +116,55 @@
                >
                   Profile
                </button>
+
+               <?php
+$row = $Uresult->fetch_assoc();
+if ($row['accounttype'] == 3) {
+    echo '<button
+                        class="nav-link"
+                        id="v-pills-bookinv-tab"
+                        data-bs-toggle="pill"
+                        data-bs-target="#v-pills-bookinv"
+                        type="button"
+                        role="tab"
+                        aria-controls="v-pills-bookinv"
+                        aria-selected="false"
+                     >
+                        Book Inventory
+                     </button>';
+}
+if ($row['accounttype'] == 2 or $row['accounttype'] == 3) {
+    echo '<button
+                        class="nav-link"
+                        id="v-pills-borrow-tab"
+                        data-bs-toggle="pill"
+                        data-bs-target="#v-pills-borrow"
+                        type="button"
+                        role="tab"
+                        aria-controls="v-pills-borrow"
+                        aria-selected="false"
+                     >
+                        Borrow
+                     </button>';
+
+    echo '<button
+                        class="nav-link"
+                        id="v-pills-return-tab"
+                        data-bs-toggle="pill"
+                        data-bs-target="#v-pills-return"
+                        type="button"
+                        role="tab"
+                        aria-controls="v-pills-return"
+                        aria-selected="false"
+                     >
+                        Return
+                     </button>';
+}
+
+?>
+
                <button
                   class="nav-link"
-                  id="v-pills-bookinv-tab"
-                  data-bs-toggle="pill"
-                  data-bs-target="#v-pills-bookinv"
-                  type="button"
-                  role="tab"
-                  aria-controls="v-pills-bookinv"
-                  aria-selected="false"
-               >
-                  Book Inventory
-               </button>
-               <button
-                  class="nav-link"
-                  id="v-pills-borrow-tab"
-                  data-bs-toggle="pill"
-                  data-bs-target="#v-pills-borrow"
-                  type="button"
-                  role="tab"
-                  aria-controls="v-pills-borrow"
-                  aria-selected="false"
-               >
-                  Borrow
-               </button>
-               <button
-                  class="nav-link"
-                  id="v-pills-return-tab"
-                  data-bs-toggle="pill"
-                  data-bs-target="#v-pills-return"
-                  type="button"
-                  role="tab"
-                  aria-controls="v-pills-return"
-                  aria-selected="false"
-               >
-                  Return
-               </button>
-               <button
-                  class="nav-link active"
                   id="v-pills-search-tab"
                   data-bs-toggle="pill"
                   data-bs-target="#v-pills-search"
@@ -110,7 +181,7 @@
                id="v-pills-tabContent"
             >
                <div
-                  class="tab-pane fade w-100"
+                  class="tab-pane fade show active w-100"
                   id="v-pills-profile"
                   role="tabpanel"
                   aria-labelledby="v-pills-profile-tab"
@@ -124,44 +195,56 @@
                         <div class="card-text">
                            <table class="table table-bordered">
                               <tbody>
-                                 <tr>
-                                    <td class="nameq fw-bold">Name</td>
-                                    <td class="namea">John Doe</td>
-                                 </tr>
-                                 <tr>
-                                    <td class="registerq fw-bold">
-                                       Registration Number
-                                    </td>
-                                    <td class="registera">RA21110420XXXXX</td>
-                                 </tr>
-                                 <tr>
-                                    <td class="emailq fw-bold">Email</td>
-                                    <td class="emaila">
-                                       mylibrary@example.com
-                                    </td>
-                                 </tr>
-                                 <tr>
-                                    <td class="phoneq fw-bold">Phone Number</td>
-                                    <td class="phonea">123-456-7890</td>
-                                 </tr>
-                                 <tr>
-                                    <td class="genderq fw-bold">Gender</td>
-                                    <td class="gendera">Male</td>
-                                 </tr>
-                                 <tr>
-                                    <td class="accounttypeq fw-bold">
-                                       Account Type
-                                    </td>
-                                    <td class="accounttypea">Student</td>
-                                 </tr>
-                                 <tr>
-                                    <td class="accountcreatedq fw-bold">
-                                       Account Created
-                                    </td>
-                                    <td class="accountcreateda">
-                                       Feb 25, 2024
-                                    </td>
-                                 </tr>
+
+                                <?php
+
+if ($Uresult->num_rows > 0) {
+    // Output data of each row
+    echo '<tr>';
+    echo "<td class='fw-bold'>Name</td>";
+    echo '<td>' . $row['fname'] . ' ' . $row['lname'] . '</td>';
+    echo '</tr>';
+
+    echo '<tr>';
+    echo "<td class='fw-bold'>Registration Number</td>";
+    echo '<td>' . $row['register_no'] . '</td>';
+    echo '</tr>';
+
+    echo '<tr>';
+    echo "<td class='fw-bold'>Email</td>";
+    echo '<td>' . $row['email'] . '</td>';
+    echo '</tr>';
+
+    echo '<tr>';
+    echo "<td class='fw-bold'>Phone Number</td>";
+    echo '<td>' . $row['phoneno'] . '</td>';
+    echo '</tr>';
+
+    echo '<tr>';
+    echo "<td class='fw-bold'>Gender</td>";
+    echo '<td>' . $row['gender'] . '</td>';
+    echo '</tr>';
+
+    echo '<tr>';
+    echo "<td class='fw-bold'>Account Type</td>";
+    if ($row['accounttype'] == '3') {
+        echo '<td>Administrator</td>';
+    } elseif ($row['accounttype'] == '2') {
+        echo '<td>Librarian</td>';
+    } elseif ($row['accounttype'] == '1') {
+        echo '<td>Student / Staff';
+    }
+    echo '</tr>';
+
+    echo '<tr>';
+    echo "<td class='fw-bold'>Account Created</td>";
+    echo '<td>' . $row['accountcreated'] . '</td>';
+    echo '</tr>';
+} else {
+    echo '0 results';
+}
+?>
+
                               </tbody>
                            </table>
                         </div>
@@ -175,6 +258,17 @@
                   aria-labelledby="v-pills-bookinv-tab"
                   tabindex="0"
                >
+                  <div>
+                  <?php
+if ($editFlag) {
+    echo '<p class="text-success text-center bg-success-subtle border border-success rounded-3 p-2">
+               <strong>Success.</strong> The changes has been saved
+         </p>';
+}
+?>
+
+                  </div>
+
                   <div class="mx-auto" style="width: 85%">
                      <div class="mb-4">
                         <form class="d-flex" role="search">
@@ -200,75 +294,166 @@
                                  <th class="col-2">Author</th>
                                  <th>Year</th>
                                  <th>Genre</th>
+                                 <th>Quantity</th>
                                  <th>Actions</th>
                               </tr>
                            </thead>
                            <tbody>
-                              <tr>
-                                 <td>Book 1</td>
-                                 <td>Author 1</td>
-                                 <td>2000</td>
-                                 <td>Horror, Fantasy, Romance</td>
-                                 <td>
-                                    <i
-                                       class="bi bi-pencil-square me-2 fs-5 text-success"
-                                    ></i>
-                                    <i class="bi bi-trash fs-5 text-danger"></i>
-                                 </td>
-                              </tr>
-                              <tr>
-                                 <td>Book 2</td>
-                                 <td>Author 2</td>
-                                 <td>2000</td>
-                                 <td>Horror, Fantasy, Romance</td>
-                                 <td>
-                                    <i
-                                       class="bi bi-pencil-square me-2 fs-5 text-success"
-                                    ></i>
-                                    <i class="bi bi-trash fs-5 text-danger"></i>
-                                 </td>
-                              </tr>
-                              <tr>
-                                 <td>Book 3</td>
-                                 <td>Author 3</td>
-                                 <td>2000</td>
-                                 <td>Horror, Fantasy, Romance</td>
-                                 <td>
-                                    <i
-                                       class="bi bi-pencil-square me-2 fs-5 text-success"
-                                    ></i>
-                                    <i class="bi bi-trash fs-5 text-danger"></i>
-                                 </td>
-                              </tr>
-                              <tr>
-                                 <td>Book 4</td>
-                                 <td>Author 4</td>
-                                 <td>2000</td>
-                                 <td>Horror, Fantasy, Romance</td>
-                                 <td>
-                                    <i
-                                       class="bi bi-pencil-square me-2 fs-5 text-success"
-                                    ></i>
-                                    <i class="bi bi-trash fs-5 text-danger"></i>
-                                 </td>
-                              </tr>
-                              <tr>
-                                 <td>Book 5</td>
-                                 <td>Author 5</td>
-                                 <td>2000</td>
-                                 <td>Horror, Fantasy, Romance</td>
-                                 <td>
-                                    <i
-                                       class="bi bi-pencil-square me-2 fs-5 text-success"
-                                    ></i>
-                                    <i class="bi bi-trash fs-5 text-danger"></i>
-                                 </td>
-                              </tr>
+
+                           <?php
+
+if (!$bookinvFlag) {
+    $bookquery = 'select * from Books order by rand() limit 5';
+    $Bresult = $conn->query($bookquery);
+
+    if ($Bresult->num_rows > 0) {
+        while ($Brow = $Bresult->fetch_assoc()) {
+            echo '<tr>';
+            echo '<td>' . $Brow['title'] . '</td>';
+            echo '<td>' . $Brow['author'] . '</td>';
+            echo '<td>' . $Brow['year'] . '</td>';
+            echo '<td>' . $Brow['genre'] . '</td>';
+            echo '<td>' . $Brow['quantity'] . '</td>';
+            echo '<td>
+                                          <i
+                                             class="bi bi-pencil-square me-2 fs-5 text-success btn"
+                                             data-bs-toggle="modal"
+                                             data-bs-target="#editModal"
+                                             d-title="' . $Brow['title'] . '"
+                                             d-author="' . $Brow['author'] . '"
+                                             d-year="' . $Brow['year'] . '"
+                                             d-genre="' . $Brow['genre'] . '"
+                                             d-quantity="' . $Brow['quantity'] . '"
+                                             d-id="' . $Brow['id'] . '"
+                                          ></i>
+                                          <i class="bi bi-trash fs-5 text-danger btn"
+                                          data-bs-toggle="modal"
+                                          data-bs-target="#deleteModal"
+                                          d-id="' . $Brow['id'] . '"
+                                          ></i>
+                                       </td>';
+            echo '</tr>';
+        }
+    }
+} else {
+    while ($Sbooks = $Sresult->fetch_assoc()) {
+        echo '<tr>';
+        echo '<td>' . $Sbooks['title'] . '</td>';
+        echo '<td>' . $Sbooks['author'] . '</td>';
+        echo '<td>' . $Sbooks['year'] . '</td>';
+        echo '<td>' . $Sbooks['genre'] . '</td>';
+        echo '<td>' . $Sbooks['quantity'] . '</td>';
+        echo '<td>
+                                          <button><i
+                                             class="bi bi-pencil-square me-2 fs-5 text-success btn"
+                                             data-bs-toggle="modal"
+                                             data-bs-target="#editModal"
+                                             d-title="' . $Sbooks['title'] . '"
+                                             d-author="' . $Sbooks['author'] . '"
+                                             d-year="' . $Sbooks['year'] . '"
+                                             d-genre="' . $Sbooks['genre'] . '"
+                                             d-quantity="' . $Sbooks['quantity'] . '"
+                                             d-id="' . $Sbooks['id'] . '"
+                                          ></i></button>
+                                          <button><i class="bi bi-trash fs-5 text-danger btn"
+                                          data-bs-toggle="modal"
+                                          data-bs-target="#deleteModal"
+                                          d-id="' . $Sbooks['id'] . '"
+                                          ></i></button>
+                                       </td>';
+        echo '</tr>';
+    }
+}
+
+?>
+
                            </tbody>
                         </table>
                      </div>
                   </div>
-                  <div style="position: absolute; bottom: 100px; right: 50px">
+
+<!-- Modal -->
+
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="exampleModalLabel">Edit Modal</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editForm" method="post">
+         <input type="hidden" name="editForm"/>
+         <input type="hidden" id="mid" name="id" value=""/>
+      <div class="modal-body gap-3">
+         <div>
+            <label>Title</label>
+            <input type="text" class="form-control" id="mtitle" name="title" value=""/>
+         </div>
+         <div class="d-flex justify-content-between">
+            <div >
+               <label>Author</label>
+               <input type="text" class="form-control" id="mauthor" name="author" value=""/>
+            </div>
+            <div>
+               <label>Year</label>
+               <input type="text" class="form-control" id="myear" name="year" value=""/>
+            </div>
+         </div>
+         <div>
+            <label>Genre</label>
+            <input type="text" class="form-control" id="mgenre" name="genre" value=""/>
+         </div>
+         <div>
+            <label>Quantity</label>
+            <input type="text" class="form-control" id="mquantity" name="quantity" value=""/>
+         </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="submit" class="btn btn-primary">Save changes</button>
+      </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="exampleModalLabel">Delete Modal</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="exampleModalLabel">Add Modal</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+                  <div style="position: absolute; bottom: 50px; right: 100px" data-bs-toggle="modal" data-bs-target="#addModal">
                      <button class="btn btn-primary">
                         <i class="bi bi-plus-lg"></i>
                         <span class="fw-bold">Add Book</span>
@@ -336,6 +521,7 @@
                                     </tr>
                                  </thead>
                                  <tbody>
+
                                     <tr>
                                        <td>Book 1</td>
                                        <td>Author 1</td>
@@ -494,7 +680,7 @@
                   </div>
                </div>
                <div
-                  class="tab-pane fade show active w-100"
+                  class="tab-pane fade w-100"
                   id="v-pills-search"
                   role="tabpanel"
                   aria-labelledby="v-pills-search-tab"
@@ -506,20 +692,25 @@
                            <div class="card-header">Books Available</div>
                            <div class="card-body">
                               <div class="mb-4">
-                                 <form class="d-flex" role="search">
+                                 <form id="searchForm" class="d-flex" role="search" method="post">
+                                    <input type="hidden" name="search_books" />
                                     <input
                                        class="form-control me-2"
                                        type="search"
+                                       name="search"
                                        placeholder="Search"
                                        aria-label="Search"
+                                       required
                                     />
                                     <button
                                        class="btn btn-outline-success"
                                        type="submit"
+                                       id="searchbtn"
                                     >
                                        Search
                                     </button>
                                  </form>
+
                               </div>
                               <table class="table">
                                  <thead>
@@ -532,49 +723,39 @@
                                     </tr>
                                  </thead>
                                  <tbody>
-                                    <tr>
-                                       <td>Book 1</td>
-                                       <td>Author 1</td>
-                                       <td>2000</td>
-                                       <td>Horror, Fantasy, Romance</td>
-                                       <td>5</td>
-                                    </tr>
-                                    <tr>
-                                       <td>Book 2</td>
-                                       <td>Author 2</td>
-                                       <td>2000</td>
-                                       <td>Horror, Fantasy, Romance</td>
-                                       <td>
-                                          4
-                                       </td>
-                                    </tr>
-                                    <tr>
-                                       <td>Book 3</td>
-                                       <td>Author 3</td>
-                                       <td>2000</td>
-                                       <td>Horror, Fantasy, Romance</td>
-                                       <td>
-                                          4
-                                       </td>
-                                    </tr>
-                                    <tr>
-                                       <td>Book 4</td>
-                                       <td>Author 4</td>
-                                       <td>2000</td>
-                                       <td>Horror, Fantasy, Romance</td>
-                                       <td>
-                                          3
-                                       </td>
-                                    </tr>
-                                    <tr>
-                                       <td>Book 5</td>
-                                       <td>Author 5</td>
-                                       <td>2000</td>
-                                       <td>Horror, Fantasy, Romance</td>
-                                       <td>
-                                          1
-                                       </td>
-                                    </tr>
+
+                                <?php
+
+if (!$searchFlag) {
+    $bookquery = 'select * from Books order by rand() limit 5';
+    $Bresult = $conn->query($bookquery);
+
+    if ($Bresult->num_rows > 0) {
+        while ($Brow = $Bresult->fetch_assoc()) {
+            echo '<tr>';
+            echo '<td>' . $Brow['title'] . '</td>';
+            echo '<td>' . $Brow['author'] . '</td>';
+            echo '<td>' . $Brow['year'] . '</td>';
+            echo '<td>' . $Brow['genre'] . '</td>';
+            echo '<td>' . $Brow['quantity'] . '</td>';
+            echo '</tr>';
+        }
+    }
+} else {
+    while ($Sbooks = $Sresult->fetch_assoc()) {
+        echo '<tr>';
+        echo '<td>' . $Sbooks['title'] . '</td>';
+        echo '<td>' . $Sbooks['author'] . '</td>';
+        echo '<td>' . $Sbooks['year'] . '</td>';
+        echo '<td>' . $Sbooks['genre'] . '</td>';
+        echo '<td>' . $Sbooks['quantity'] . '</td>';
+        echo '</tr>';
+    }
+}
+
+?>
+
+
                                  </tbody>
                               </table>
                            </div>
@@ -596,5 +777,81 @@
          integrity="sha384-BBtl+eGJRgqQAUMxJ7pMwbEyER4l1g+O15P+16Ep7Q9Q+zqX6gSbd85u4mG4QzX+"
          crossorigin="anonymous"
       ></script>
+      <script>
+    window.addEventListener('DOMContentLoaded', (event) => {
+        // Check if the search button was clicked
+        let searchClicked = sessionStorage.getItem('searchClicked');
+        let bookInventory = sessionStorage.getItem('bookInventory');
+
+        console.log(searchClicked, bookInventory);
+
+        if (searchClicked === 'true') {
+            // Remove the searchClicked flag from sessionStorage
+            sessionStorage.setItem('searchClicked', false);
+            console.log("changed to false and search tab");
+
+            // Set the active tab and pane for the search tab
+            document.getElementById("v-pills-profile-tab").classList.remove('active');
+            document.getElementById("v-pills-profile").classList.remove('active', 'show');
+            document.getElementById("v-pills-search-tab").classList.add('active');
+            document.getElementById("v-pills-search").classList.add('active', 'show');
+        }
+
+        if (bookInventory === 'true') {
+            // Remove the bookInventory flag from sessionStorage
+            sessionStorage.setItem('bookInventory', false);
+            console.log("changed to false and bookinv tab");
+
+            // Set the active tab and pane for the bookinv tab
+            document.getElementById("v-pills-profile-tab").classList.remove('active');
+            document.getElementById("v-pills-profile").classList.remove('active', 'show');
+            document.getElementById("v-pills-bookinv-tab").classList.add('active');
+            document.getElementById("v-pills-bookinv").classList.add('active', 'show');
+        }
+
+
+    });
+
+    document.getElementById('v-pills-search-tab').addEventListener('click', (event) => {
+        sessionStorage.setItem("searchClicked", true);
+        console.log("clicked search");
+    })
+
+    document.getElementById('searchbtn').addEventListener('click', (event) => {
+        sessionStorage.setItem("searchClicked", true);
+        console.log("clicked search btn");
+    })
+
+    document.getElementById('v-pills-bookinv-tab').addEventListener('click', (event) => {
+        sessionStorage.setItem("bookInventory", true);
+        console.log("clicked bookinv");
+    })
+
+    document.getElementById('logout').addEventListener('click', (event) => {
+      console.log("clicked signOut");
+      sessionStorage.setItem("searchClicked", false);
+        console.log("clicked signOut");
+    })
+
+</script>
+<script>
+   document.getElementById('editModal').addEventListener('show.bs.modal', (event) => {
+      var modal = event.relatedTarget;
+      var title = modal.getAttribute('d-title');
+      var author = modal.getAttribute('d-author');
+      var year = modal.getAttribute('d-year');
+      var genre = modal.getAttribute('d-genre');
+      var quantity = modal.getAttribute('d-quantity');
+      var id = modal.getAttribute('d-id');
+
+      document.getElementById('mtitle').value = title;
+      document.getElementById('mauthor').value = author;
+      document.getElementById('myear').value = year;
+      document.getElementById('mgenre').value = genre;
+      document.getElementById('mquantity').value = quantity;
+      document.getElementById('mid').value = id;
+   })
+</script>
+
    </body>
 </html>

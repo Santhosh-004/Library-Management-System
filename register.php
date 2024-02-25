@@ -1,3 +1,72 @@
+<?php
+
+session_start();
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+	$server = 'localhost';
+	$username = 'root';
+	$password = '';
+	$dbname = 'library';
+
+	$conn = new mysqli($server, $username, $password, $dbname);
+
+	if ($conn->connect_error) {
+		die('Connection failed: ' . $conn->connect_error);
+	} else {
+		$fname = $_POST['fname'];
+		$lname = $_POST['lname'];
+		$email = $_POST['email'];
+		$password = $_POST['password'];
+		$cpassword = $_POST['cpassword'];
+		$dob = $_POST['dob'];
+		$gender = $_POST['gender'];
+		$phone = $_POST['phone'];
+		$regno = strtoupper($_POST['regno']);
+
+		$passmatch = false;
+		$agematch = false;
+		$exist = false;
+
+		// echo $fname . ' ' . $lname . ' ' . $email . ' ' . $password . ' ' . $cpassword . ' ' . $dob . ' ' . $gender . ' ' . $phone . ' ' . $regno;
+
+		if ($password == $cpassword) {
+			$year = date('Y', strtotime($dob));
+			$passmatch = true;
+			if (2024 - intval($year) >= 18) {
+				$agematch = true;
+			}
+		}
+
+		if ($passmatch && $agematch) {
+			$checker1 = "select count(register_no) from Users where register_no = '$regno' and email = '$email'";
+			$cresult = $conn->query($checker1);
+
+			// echo 'check ' . $cresult->fetch_row()[0];
+
+			if (!$cresult->fetch_row()[0]) {
+				$exist = true;
+			}
+		}
+
+		// echo 'pass ' . $passmatch . ' age ' . $agematch . ' exist ' . $exist;
+		if ($exist) {
+			$now = date('Y-m-d');
+			$writeQ = "insert into Users (register_no, fname, lname, email, dob, gender, phoneno, accountcreated) values ('$regno', '$fname', '$lname', '$email', '$dob', '$gender', '$phone', '$now')";
+			$iresult = $conn->query($writeQ);
+			$writeQ = "insert into Login (email, password) values ('$email', '$password')";
+			$iresult = $conn->query($writeQ);
+		}
+
+		if ($iresult) {
+			$_SESSION['register'] = true;
+			header('Location: login.php');
+			exit();
+		}
+	}
+}
+
+?>
+
 <!DOCTYPE html>
 <html lang="en">
    <head>
@@ -31,8 +100,19 @@
          </div>
       </nav>
       <div
-         class="container h-100 mt-4 d-flex align-items-center justify-content-center"
+         class="container h-100 mt-4 d-flex flex-column align-items-center justify-content-center"
       >
+			<div class="w-75">
+				<?php
+					if (!$passmatch) {
+						echo '<p class="text-danger text-center bg-danger-subtle border border-danger rounded-3 p-2">Passwords do not match. Try again.</p>';
+					} elseif (!$agematch) {
+						echo '<p class="text-danger text-center bg-danger-subtle border border-danger rounded-3 p-2">Age must be greater than 18. Try again.</p>';
+					} elseif (!$exist) {
+						echo '<p class="text-danger text-center bg-danger-subtle border border-danger rounded-3 p-2">User Already exist. Login in.</p>';
+					}
+				?>
+			</div>
          <div class="card w-100">
             <div class="card-header">
                <h2 class="m-0 p-0 fw-bold text-center">Registration Page</h2>
