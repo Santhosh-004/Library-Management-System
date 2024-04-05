@@ -22,25 +22,32 @@ $editFlag = false;
 $deleteFlag = false;
 $insertFlag = false;
 $invSearchFlag = false;
+$buserFlag = false;
+$bsearchFlag = false;
+$ruserFlag = false;
+$returnFlag = false;
+$lendFlag = 0;
+$giveFlag = 0;
 
-function Qsearch($given, $conn, $union)
+function Qsearch($given, $conn, $union, $quantity = false)
 {
    if (!$union) {
       $Squery = "select * from Books where lower(title) like lower('%$given%') or lower(genre) like lower('%$given%') or lower(author) like lower('%$given%') or lower(year) like lower('%$given%') limit 5";
    } else {
-      $Squery = "(select * from Books where id = $given) union (select * from Books where id != $given order by rand() limit 4)";
+      if ($quantity) {
+         $Squery = "(select * from Books where id = $given and quantity > 0) union (select * from Books where quantity > 0 order by rand() limit 4)";
+      } else {
+         $Squery = "(select * from Books where id = $given) union (select * from Books where id != $given order by rand() limit 4)";
+      }
    }
-
    $Sresult = $conn->query($Squery);
-
    return $Sresult;
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
    if (isset($_POST['search_books'])) {
       $Sgiven = $_POST['search'];
-      $Sresult = Qsearch($Sgiven, $conn, false);
-
+      $SSresult = Qsearch($Sgiven, $conn, false, true);
       $searchFlag = true;
    }
 
@@ -89,7 +96,103 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
       $Sresult = Qsearch($Sgiven, $conn, false);
       $invSearchFlag = true;
    }
+
+   if (isset($_POST['bmailsearch'])) {
+      $bemail = $_POST['bemail'];
+      $Bsql = "select * from Users where email = '$bemail'";
+      $Bresult = $conn->query($Bsql);
+      $buser = $Bresult->fetch_assoc();
+      $buserFlag = true;
+      $_SESSION['buser'] = $buser;
+   }
+
+   if (isset($_POST['borrow_books'])) {
+      $buser = $_SESSION['buser'];
+      $buserFlag = true;
+      $Sgiven = $_POST['borrow_search'];
+      $BSresult = Qsearch($Sgiven, $conn, false);
+      $bsearchFlag = true;
+   }
+
+   if (isset($_POST['borrow_selected'])) {
+      $books = $_POST['borrow_selected'] . ',';
+      $buser = $_SESSION['buser'];
+      $noOfBooks = count(explode(',', $books)) - 1;
+      if ($buser['availableLimit'] - $noOfBooks < 0) {
+         $lendFlag = -1;
+      } else {
+         $newbook = substr($books, 0, -1);
+         $Bsql = "update Users set booksOwned=concat(booksOwned,'$books') where email = '$buser[email]'";
+         $Asql = "update Users set availableLimit = availableLimit - $noOfBooks where email = '$buser[email]'";
+         $Csql = "select * from Users where email = '$buser[email]'";
+         $Dsql = "update Books set quantity = quantity - 1 where id in ($newbook)";
+         $conn->query($Bsql);
+         $conn->query($Asql);
+         $conn->query($Dsql);
+         $Cresult = $conn->query($Csql);
+         $buser = $Cresult->fetch_assoc();
+         echo ' new buser: ' . $buser['availableLimit'];
+         $_SESSION['buser'] = $buser;
+         $buserFlag = true;
+         $lendFlag = 1;
+      }
+   }
+
+   if (isset($_POST['ruser_email'])) {
+      $remail = $_POST['ruser_email'];
+      $Rsql = "select * from Users where email = '$remail'";
+      $Rresult = $conn->query($Rsql);
+      $ruser = $Rresult->fetch_assoc();
+      $ruserFlag = true;
+      $_SESSION['ruser'] = $ruser;
+   }
+
+   if (isset($_POST['return_selected'])) {
+      $ruser = $_SESSION['ruser'];
+      $ruserFlag = true;
+      $Rgiven = $_POST['return_selected'];
+      
+      echo 'Rgiven: ' . $Rgiven;
+
+      if ($ruser['availableLimit'] + count(explode(',', $Rgiven)) > 3) {
+         $giveFlag = -1;
+      } else {
+         
+      $Rquery = "update Books set quantity = quantity + 1 where id in ($Rgiven)";
+      $conn->query($Rquery);
+
+      $all = explode(',', $ruser['booksOwned']);
+      $select = explode(',', $Rgiven);
+
+      $difference = array_diff($all, $select);
+      $result = array_values($difference);
+
+      $final = '';
+      $count = count($select);
+
+      foreach ($result as $some) {
+         
+         if ($some == '') {
+            continue;
+         }
+         $final = $final . ($some . ',');
+         
+      }
+      echo 'final: ' . $final . ' count: ' . $count;
+      $Aquery = "update Users set booksOwned = '$final', availableLimit = availableLimit + $count where email = '$ruser[email]'";
+      $conn->query($Aquery);
+
+      $returnFlag = true;
+   }
+
+      $resetQuery = "select * from Users where email = '$ruser[email]'";
+      $Cresult = $conn->query($resetQuery);
+      $ruser = $Cresult->fetch_assoc();
+      $_SESSION['ruser'] = $ruser;
+      
+   }
 }
+
 
 ?>
 
@@ -99,13 +202,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
    <meta charset="utf-8" />
    <meta name="viewport" content="width=device-width, initial-scale=1" />
-   <title>Bootstrap demo</title>
+   <title>Library Management System</title>
    <link rel="stylesheet" href="new1.css" />
    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous" />
    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+
 </head>
 
-<body>
+<body class="d-none">
 
    <nav class="navbar bg-dark border-bottom border-body navbar-expand-lg" data-bs-theme="dark">
       <div class="container-fluid">
@@ -188,7 +293,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                               <?php
 
                               if ($Uresult->num_rows > 0) {
-                                 // Output data of each row
                                  echo '<tr>';
                                  echo "<td class='fw-bold'>Name</td>";
                                  echo '<td>' . $row['fname'] . ' ' . $row['lname'] . '</td>';
@@ -228,6 +332,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                  echo '<tr>';
                                  echo "<td class='fw-bold'>Account Created</td>";
                                  echo '<td>' . $row['accountcreated'] . '</td>';
+                                 echo '</tr>';
+
+                                 echo '<tr>';
+                                 echo "<td class='fw-bold'>Books Owned</td>";
+                                 echo '<td>';
+                                 $aquery = "select booksOwned from Users where email = '$row[email]'";
+                                 $aresult = $conn->query($aquery);
+                                 $blist = $aresult->fetch_assoc()['booksOwned'];
+                                 $blist = substr($blist, 0, -1);
+                                 if ($blist == '') {
+                                    echo 'No books owned';
+                                 } else {
+                                    $bquery = "select title from Books where id in ($blist)";
+                                    $bookresult = $conn->query($bquery);
+                                    $count = 1;
+                                    if ($bookresult->num_rows > 0) {
+                                       while ($row = $bookresult->fetch_assoc()) {
+                                          echo $count . ') ' . $row['title'] . '<br>';
+                                          $count++;
+                                       }
+                                    }
+                                 }
+                                 echo '</td>';
                                  echo '</tr>';
                               } else {
                                  echo '0 results';
@@ -512,7 +639,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                   </div>
                </div>
 
-               <div style="position: absolute; bottom: 50px; right: 100px" data-bs-toggle="modal" data-bs-target="#addModal">
+               <div style="position: absolute; bottom: 30px; right: 100px" data-bs-toggle="modal" data-bs-target="#addModal">
                   <button class="btn btn-primary">
                      <i class="bi bi-plus-lg"></i>
                      <span class="fw-bold">Add Book</span>
@@ -522,28 +649,76 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <div class="tab-pane fade w-100" id="v-pills-borrow" role="tabpanel" aria-labelledby="v-pills-borrow-tab" tabindex="0">
                <div class="mx-auto" style="width: 85%">
                   <div class="mb-4">
-                     <form class="d-flex justify-content-evenly align-items-center">
+                     <form class="d-flex justify-content-evenly align-items-center" method="post">
+                        <input type="hidden" name="bmailsearch" />
                         <div class="d-flex w-75 align-items-center">
                            <label for="email" class="fw-bold">User Email:</label>
-                           <input class="form-control ms-4 w-75" type="email" />
+                           <input class="form-control ms-4 w-75" type="email" name="bemail" />
                         </div>
-                        <button class="btn btn-outline-primary" type="submit">
+                        <button class="btn btn-outline-primary" type="submit" id="bemailCheck">
                            <i class="bi bi-check-lg"></i>
                            <span class="fw-bold">Check</span>
                         </button>
                      </form>
                   </div>
+                  <?php
+                  if ($buser['availableLimit'] != NULL) {
+                     echo '<div class="alert bg-success-subtle text-success py-3 px-3 fw-bold d-flex align-items-center justify-content-between" role="alert">';
+
+                     echo '<p class="m-0 p-0">Name : ' . $buser['fname'] . ' ' . $buser['lname'] . '</p>';
+                     echo '<p class="m-0 p-0">Remaining Limit : ' . $buser['availableLimit'] . '</p>';
+
+                     if ($buser['availableLimit'] == 0) {
+                        echo '<p class="m-0 p-0 text-danger">Limit reached</p>';
+                     }
+                     echo '<p class="m-0 p-0">Account Type : ';
+                     if ($buser['accounttype'] == 3) {
+                        echo 'Admin';
+                     } elseif ($buser['accounttype'] == 2) {
+                        echo 'Librarian';
+                     } elseif ($buser['accounttype'] == 1) {
+                        echo 'Student/Staff';
+                     }
+                     echo '</p></div>';
+                  } elseif ($bemail != NULL) {
+                     echo '<div class="alert alert-danger fw-bold text-center" role="alert">User does not exist!</div>';
+                  }
+                  echo '<div class="alert alert-danger alert-dismissible fade show d-none" role="alert" id="limitalert">
+                  <strong>Limit Reached</strong> Only 3 books can be borrowed.
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" id="limitalertclose"></button>
+                </div>';
+
+                  if ($lendFlag == 1) {
+                     echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
+                  <strong>Success!</strong> Book lent successfully.
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+                  } elseif ($lendFlag == -1) {
+                     echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                  <strong>Failed!</strong> Book could not be lent. <strong>Exceeding Limit</strong>.
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+                  }
+                  $lendFlag = 0;
+                  ?>
                   <div>
                      <div class="card">
                         <div class="card-header">Books Available</div>
                         <div class="card-body">
                            <div class="mb-4">
-                              <form class="d-flex" role="search">
-                                 <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search" />
-                                 <button class="btn btn-outline-success" type="submit">
+                              <?php
+
+                              echo '<form class="d-flex" role="search" id="borrowSearch" method="post">
+                                 <input type="hidden" name="borrow_books" />
+                                 <input class="form-control me-2" type="search" name="borrow_search" placeholder="Search" aria-label="Search"' . (!$buserFlag ? ' disabled' : '') . '/>
+                                 <button class="btn btn-outline-success' . (!$buserFlag ? ' disabled' : '') . '" type="submit">
                                     Search
                                  </button>
-                              </form>
+                              </form>';
+
+                              ?>
+
+
                            </div>
                            <table class="table">
                               <thead>
@@ -557,80 +732,76 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                               </thead>
                               <tbody>
 
-                                 <tr>
-                                    <td>Book 1</td>
-                                    <td>Author 1</td>
-                                    <td>2000</td>
-                                    <td>Horror, Fantasy, Romance</td>
-                                    <td>
-                                       <button class="btn btn-primary">
-                                          Select
-                                       </button>
-                                    </td>
-                                 </tr>
-                                 <tr>
-                                    <td>Book 2</td>
-                                    <td>Author 2</td>
-                                    <td>2000</td>
-                                    <td>Horror, Fantasy, Romance</td>
-                                    <td>
-                                       <button class="btn btn-primary">
-                                          Select
-                                       </button>
-                                    </td>
-                                 </tr>
-                                 <tr>
-                                    <td>Book 3</td>
-                                    <td>Author 3</td>
-                                    <td>2000</td>
-                                    <td>Horror, Fantasy, Romance</td>
-                                    <td>
-                                       <button class="btn btn-primary">
-                                          Select
-                                       </button>
-                                    </td>
-                                 </tr>
-                                 <tr>
-                                    <td>Book 4</td>
-                                    <td>Author 4</td>
-                                    <td>2000</td>
-                                    <td>Horror, Fantasy, Romance</td>
-                                    <td>
-                                       <button class="btn btn-primary">
-                                          Select
-                                       </button>
-                                    </td>
-                                 </tr>
-                                 <tr>
-                                    <td>Book 5</td>
-                                    <td>Author 5</td>
-                                    <td>2000</td>
-                                    <td>Horror, Fantasy, Romance</td>
-                                    <td>
-                                       <button class="btn btn-primary">
-                                          Select
-                                       </button>
-                                    </td>
-                                 </tr>
+                                 <?php
+
+
+                                 if (!$bsearchFlag) {
+
+                                    $query = "select * from Books where quantity > 0 order by rand() limit 5";
+                                    $Sresult = $conn->query($query);
+
+                                    if (!$bsearch && $buser['availableLimit'] == NULL) {
+
+                                       while ($Srow = $Sresult->fetch_assoc()) {
+                                          echo '<tr>';
+                                          echo '<td>' . $Srow['title'] . '</td>';
+                                          echo '<td>' . $Srow['author'] . '</td>';
+                                          echo '<td>' . $Srow['year'] . '</td>';
+                                          echo '<td>' . $Srow['genre'] . '</td>';
+                                          echo '<td><button class="btn btn-secondary disabled">Select</button></td>';
+                                          echo '</tr>';
+                                       }
+                                    } elseif ($buser['availableLimit'] != NULL) {
+
+                                       while ($Srow = $Sresult->fetch_assoc()) {
+                                          echo '<tr>';
+                                          echo '<td>' . $Srow['title'] . '</td>';
+                                          echo '<td>' . $Srow['author'] . '</td>';
+                                          echo '<td>' . $Srow['year'] . '</td>';
+                                          echo '<td>' . $Srow['genre'] . '</td>';
+                                          echo '<td><button class="btn btn-secondary" onclick="bSelectClicked(' . $Srow['id'] . ', ' . $buser['availableLimit'] . ')" id = "btn-' . $Srow['id'] . '">Select</button></td>';
+                                          echo '</tr>';
+                                       }
+                                    }
+                                 } else {
+
+                                    while ($Srow = $BSresult->fetch_assoc()) {
+                                       echo '<tr>';
+                                       echo '<td>' . $Srow['title'] . '</td>';
+                                       echo '<td>' . $Srow['author'] . '</td>';
+                                       echo '<td>' . $Srow['year'] . '</td>';
+                                       echo '<td>' . $Srow['genre'] . '</td>';
+                                       echo '<td><button class="btn btn-secondary" onclick="bSelectClicked(' . $Srow['id'] . ', ' . $buser['availableLimit'] . ')" id = "btn-' . $Srow['id'] . '">Select</button></td>';
+                                       echo '</tr>';
+                                    }
+                                 }
+
+
+                                 ?>
+
                               </tbody>
                            </table>
                         </div>
                      </div>
                   </div>
-                  <div class="mt-4 d-flex justify-content-center">
-                     <button class="btn btn-primary fw-bold" id="borrow">
-                        Borrow
-                     </button>
-                  </div>
+                  <form id="borrowForm" method="post">
+                     <input type="hidden" id="borrow_selected" name="borrow_selected" value="" />
+                     <div class="mt-4 d-flex justify-content-center">
+                        <button class="btn btn-primary fw-bold" id="borrow_btn" type="submit">
+                           Borrow
+                        </button>
+                     </div>
+                  </form>
                </div>
             </div>
             <div class="tab-pane fade w-100" id="v-pills-return" role="tabpanel" aria-labelledby="v-pills-return-tab" tabindex="0">
                <div class="mx-auto" style="width: 85%">
                   <div class="mb-4">
-                     <form class="d-flex justify-content-evenly align-items-center">
+                     <form class="d-flex justify-content-evenly align-items-center" method="POST">
+
                         <div class="d-flex w-75 align-items-center">
                            <label for="email" class="fw-bold">User Email:</label>
-                           <input class="form-control ms-4 w-75" type="email" />
+                           <input class="form-control ms-4 w-75" type="email" name="ruser_email" />
                         </div>
                         <button class="btn btn-outline-primary" type="submit">
                            <i class="bi bi-check-lg"></i>
@@ -638,6 +809,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </button>
                      </form>
                   </div>
+                  <?php
+                  if ($ruser['availableLimit'] != NULL) {
+                     echo '<div class="alert bg-success-subtle text-success py-3 px-3 fw-bold d-flex align-items-center justify-content-between" role="alert">';
+
+                     echo '<p class="m-0 p-0">Name : ' . $ruser['fname'] . ' ' . $ruser['lname'] . '</p>';
+                     echo '<p class="m-0 p-0">Books Borrowed : ' . 3 - $ruser['availableLimit'] . '</p>';
+
+                     echo '<p class="m-0 p-0">Account Type : ';
+                     if ($ruser['accounttype'] == 3) {
+                        echo 'Admin';
+                     } elseif ($ruser['accounttype'] == 2) {
+                        echo 'Librarian';
+                     } elseif ($ruser['accounttype'] == 1) {
+                        echo 'Student/Staff';
+                     }
+                     echo '</p></div>';
+                  } elseif ($ruserFlag) {
+                     echo '<div class="alert alert-danger fw-bold text-center" role="alert">User does not exist!</div>';
+                  }
+
+                  if ($returnFlag) {
+                     echo '<div class="alert alert-success fw-bold text-center" role="alert">Returned successfully!</div>';
+                  }
+
+                  if ($giveFlag == -1) {
+                     echo '<div class="alert alert-danger fw-bold text-center" role="alert">Failed to Return Books. <strong>No books to return!</strong></div>';
+                     $giveFlag = 0;
+                  }
+                  ?>
+
                   <div>
                      <div class="card">
                         <div class="card-header">
@@ -647,55 +848,53 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                            <table class="table">
                               <thead>
                                  <tr>
-                                    <th class="col-3">Title</th>
-                                    <th class="col-2">Author</th>
+                                    <th class="col-5">Title</th>
+                                    <th class="col-3">Author</th>
                                     <th>Year</th>
-                                    <th>Genre</th>
-                                    <th>Actions</th>
+                                    <th>Action</th>
                                  </tr>
                               </thead>
                               <tbody>
-                                 <tr>
-                                    <td>Book 1</td>
-                                    <td>Author 1</td>
-                                    <td>2000</td>
-                                    <td>Horror, Fantasy, Romance</td>
-                                    <td>
-                                       <button class="btn btn-primary">
-                                          Select
-                                       </button>
-                                    </td>
-                                 </tr>
-                                 <tr>
-                                    <td>Book 2</td>
-                                    <td>Author 2</td>
-                                    <td>2000</td>
-                                    <td>Horror, Fantasy, Romance</td>
-                                    <td>
-                                       <button class="btn btn-primary">
-                                          Select
-                                       </button>
-                                    </td>
-                                 </tr>
-                                 <tr>
-                                    <td>Book 3</td>
-                                    <td>Author 3</td>
-                                    <td>2000</td>
-                                    <td>Horror, Fantasy, Romance</td>
-                                    <td>
-                                       <button class="btn btn-primary">
-                                          Select
-                                       </button>
-                                    </td>
-                                 </tr>
+
+                                 <?php
+                                 if ($ruserFlag) {
+                                    if ($ruser['availableLimit'] != NULL && $ruser['availableLimit'] != 3) {
+                                       $idquery = "select booksOwned from Users where email = '" . "$ruser[email]" . "'";
+                                       $Iresult = $conn->query($idquery);
+                                       $Ibook = $Iresult->fetch_assoc();
+                                       $Ibook = substr($Ibook['booksOwned'], 0, -1);
+                                       $rquery = "select * from Books where id in (" . $Ibook . ")";
+                                       $Rresult = $conn->query($rquery);
+                                       while ($Srow = $Rresult->fetch_assoc()) {
+                                          echo '<tr>';
+                                          echo '<td>' . $Srow['title'] . '</td>';
+                                          echo '<td>' . $Srow['author'] . '</td>';
+                                          echo '<td>' . $Srow['year'] . '</td>';
+                                          echo '<td><button class="btn btn-secondary" onclick="rSelectClicked(' . $Srow['id'] . ')" id = "rbtn-' . $Srow['id'] . '">Select</button></td>';
+                                          echo '</tr>';
+                                       }
+                                    } else {
+
+                                       echo '<tr><td colspan="5" class="text-center">No Books Borrowed</td></tr>';
+                                    }
+                                 } else {
+
+                                    echo '<tr><td colspan="5" class="text-center">Enter User Email and check</td></tr>';
+                                 }
+
+                                 ?>
+
                               </tbody>
                            </table>
                         </div>
                      </div>
                   </div>
-                  <div class="mt-4 d-flex justify-content-center">
-                     <button class="btn btn-primary fw-bold">Return</button>
-                  </div>
+                  <form method="post">
+                     <input type="hidden" id="return_selected" name="return_selected" value="" />
+                     <div class="mt-4 d-flex justify-content-center">
+                        <button class="btn btn-primary fw-bold" type="submit" id="return_btn">Return</button>
+                     </div>
+                  </form>
                </div>
             </div>
             <div class="tab-pane fade w-100" id="v-pills-search" role="tabpanel" aria-labelledby="v-pills-search-tab" tabindex="0">
@@ -714,6 +913,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                               </form>
 
                            </div>
+
+
+
                            <table class="table">
                               <thead>
                                  <tr>
@@ -735,22 +937,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     if ($Bresult->num_rows > 0) {
                                        while ($Brow = $Bresult->fetch_assoc()) {
                                           echo '<tr>';
-                                          echo '<td>' . $Brow['title'] . '</td>';
-                                          echo '<td>' . $Brow['author'] . '</td>';
-                                          echo '<td>' . $Brow['year'] . '</td>';
-                                          echo '<td>' . $Brow['genre'] . '</td>';
-                                          echo '<td>' . $Brow['quantity'] . '</td>';
+                                          echo '<td class="' . ($Brow['quantity'] == 0 ? 'text-secondary' : '') . '">' . $Brow['title'] . '</td>';
+                                          echo '<td class="' . ($Brow['quantity'] == 0 ? 'text-secondary' : '') . '">' . $Brow['author'] . '</td>';
+                                          echo '<td class="' . ($Brow['quantity'] == 0 ? 'text-secondary' : '') . '">' . $Brow['year'] . '</td>';
+                                          echo '<td class="' . ($Brow['quantity'] == 0 ? 'text-secondary' : '') . '">' . $Brow['genre'] . '</td>';
+                                          echo '<td class="' . ($Brow['quantity'] == 0 ? 'text-secondary' : '') . '">' . $Brow['quantity'] . '</td>';
                                           echo '</tr>';
                                        }
                                     }
                                  } else {
-                                    while ($Sbooks = $Sresult->fetch_assoc()) {
+                                    while ($Srow = $SSresult->fetch_assoc()) {
                                        echo '<tr>';
-                                       echo '<td>' . $Sbooks['title'] . '</td>';
-                                       echo '<td>' . $Sbooks['author'] . '</td>';
-                                       echo '<td>' . $Sbooks['year'] . '</td>';
-                                       echo '<td>' . $Sbooks['genre'] . '</td>';
-                                       echo '<td>' . $Sbooks['quantity'] . '</td>';
+                                       echo '<td class="' . ($Srow['quantity'] == 0 ? 'text-secondary' : '') . '">' . $Srow['title'] . '</td>';
+                                       echo '<td class="' . ($Srow['quantity'] == 0 ? 'text-secondary' : '') . '">' . $Srow['author'] . '</td>';
+                                       echo '<td class="' . ($Srow['quantity'] == 0 ? 'text-secondary' : '') . '">' . $Srow['year'] . '</td>';
+                                       echo '<td class="' . ($Srow['quantity'] == 0 ? 'text-secondary' : '') . '">' . $Srow['genre'] . '</td>';
+                                       echo '<td class="' . ($Srow['quantity'] == 0 ? 'text-secondary' : '') . '">' . $Srow['quantity'] . '</td>';
                                        echo '</tr>';
                                     }
                                  }
@@ -771,13 +973,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js" integrity="sha384-BBtl+eGJRgqQAUMxJ7pMwbEyER4l1g+O15P+16Ep7Q9Q+zqX6gSbd85u4mG4QzX+" crossorigin="anonymous"></script>
+
    <script>
       window.addEventListener('DOMContentLoaded', (event) => {
          // Check if the search button was clicked
+
+         document.querySelector('body').classList.add('d-none');
+
+
          let searchClicked = sessionStorage.getItem('searchClicked');
          let bookInventory = sessionStorage.getItem('bookInventory');
-
-         console.log(searchClicked, bookInventory);
+         let borrowtab = sessionStorage.getItem('borrowtab');
+         let returntab = sessionStorage.getItem('returntab');
 
          if (searchClicked === 'true') {
             console.log("search tab");
@@ -799,27 +1006,74 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             document.getElementById("v-pills-bookinv").classList.add('active', 'show');
          }
 
+         if (borrowtab === 'true') {
+            console.log("borrow tab");
+
+            // Set the active tab and pane for the borrow tab
+            document.getElementById("v-pills-profile-tab").classList.remove('active');
+            document.getElementById("v-pills-profile").classList.remove('active', 'show');
+            document.getElementById("v-pills-borrow-tab").classList.add('active');
+            document.getElementById("v-pills-borrow").classList.add('active', 'show');
+         }
+
+         if (returntab === 'true') {
+            console.log("return tab");
+
+            // Set the active tab and pane for the borrow tab
+            document.getElementById("v-pills-profile-tab").classList.remove('active');
+            document.getElementById("v-pills-profile").classList.remove('active', 'show');
+            document.getElementById("v-pills-return-tab").classList.add('active');
+            document.getElementById("v-pills-return").classList.add('active', 'show');
+         }
+
+         document.querySelector('body').classList.remove('d-none');
+
 
       });
 
       document.getElementById('v-pills-search-tab').addEventListener('click', (event) => {
          sessionStorage.setItem("searchClicked", true);
          sessionStorage.setItem("bookInventory", false);
+         sessionStorage.setItem("borrowtab", false);
+         sessionStorage.setItem("returntab", false);
          console.log("clicked search");
       })
 
       document.getElementById('v-pills-bookinv-tab').addEventListener('click', (event) => {
          sessionStorage.setItem("bookInventory", true);
          sessionStorage.setItem("searchClicked", false);
-         console.log("clicked bookinv");
+         sessionStorage.setItem("borrowtab", false);
+         sessionStorage.setItem("returntab", false);
+         console.log("clicked bookinv", sessionStorage.getItem("activeTab"));
+      })
+
+      document.querySelector('#v-pills-borrow-tab').addEventListener('click', (event) => {
+         console.log("clicked borrow");
+         sessionStorage.setItem("borrowtab", true);
+         sessionStorage.setItem("searchClicked", false);
+         sessionStorage.setItem("bookInventory", false);
+         sessionStorage.setItem("returntab", false);
+      })
+
+      document.querySelector('#v-pills-return-tab').addEventListener('click', (event) => {
+
+         console.log("clicked return");
+         sessionStorage.setItem('returntab', true);
+         sessionStorage.setItem("searchClicked", false);
+         sessionStorage.setItem("bookInventory", false);
+         sessionStorage.setItem("borrowtab", false);
+
       })
 
       document.getElementById('logout').addEventListener('click', (event) => {
          console.log("clicked signOut");
          sessionStorage.setItem("searchClicked", false);
          sessionStorage.setItem("bookInventory", false);
+         sessionStorage.setItem("borrowtab", false);
+         sessionStorage.setItem("returntab", false);
       })
    </script>
+
    <script>
       document.getElementById('editModal').addEventListener('show.bs.modal', (event) => {
          var modal = event.relatedTarget;
@@ -860,6 +1114,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
       document.querySelector("#addbook").addEventListener("click", (event) => {
          value = document.querySelector("#aquantity").value;
          console.log(value);
+
          if (value >= 0) {
             document.querySelector("#addForm").submit();
             document.querySelector("#wavalue").classList.add("d-none");
@@ -868,6 +1123,115 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             document.querySelector("#wavalue").classList.remove("d-none");
             event.preventDefault();
          }
+      })
+   </script>
+
+   <script>
+      let books = [];
+      let rbook = [];
+
+      if (localStorage.getItem('books')) {
+         books = JSON.parse(localStorage.getItem('books'));
+         books.forEach((id) => {
+            document.querySelector('#btn-' + id).classList.remove('btn-secondary');
+            document.querySelector('#btn-' + id).classList.add('btn-primary');
+            document.querySelector('#btn-' + id).innerHTML = 'Selected';
+         });
+      }
+
+      if (localStorage.getItem('rbook')) {
+         rbook = JSON.parse(localStorage.getItem('rbook'));
+         rbook.forEach((id) => {
+            document.querySelector('#rbtn-' + id).classList.remove('btn-secondary');
+            document.querySelector('#rbtn-' + id).classList.add('btn-primary');
+            document.querySelector('#rbtn-' + id).innerHTML = 'Selected';
+         })
+      }
+
+
+      function bSelectClicked(bid, limit) {
+         console.log("button clicked", bid);
+         if (!books.includes(bid) && books.length < limit) {
+            books.push(bid);
+            document.querySelector('#btn-' + bid).classList.remove('btn-secondary');
+            document.querySelector('#btn-' + bid).classList.add('btn-primary');
+            document.querySelector('#btn-' + bid).innerHTML = 'Selected';
+            console.log("add : ", books.join(','));
+            localStorage.setItem('books', JSON.stringify(books));
+            document.querySelector('#borrow_selected').value = books.join(',');
+
+         } else {
+            if (document.querySelector('#btn-' + bid).innerHTML === 'Selected') {
+               books.splice(books.indexOf(bid), 1);
+               document.querySelector('#btn-' + bid).classList.add('btn-secondary');
+               document.querySelector('#btn-' + bid).classList.remove('btn-primary');
+               document.querySelector('#btn-' + bid).innerHTML = 'Select';
+               console.log("remove : ", books.join(','));
+               localStorage.setItem('books', JSON.stringify(books));
+               document.querySelector('#borrow_selected').value = books.join(',');
+
+            } else {
+               console.log("limit reached");
+               document.querySelector('#limitalert').classList.remove('d-none');
+            }
+         }
+      }
+
+      function rSelectClicked(rid) {
+         console.log("button clicked", rid);
+         if (!rbook.includes(rid)) {
+            rbook.push(rid);
+            console.log("add : ", rbook.join(','));
+            document.querySelector('#rbtn-' + rid).classList.remove('btn-secondary');
+            document.querySelector('#rbtn-' + rid).classList.add('btn-primary');
+            document.querySelector('#rbtn-' + rid).innerHTML = 'Selected';
+            localStorage.setItem('rbook', JSON.stringify(rbook));
+            document.querySelector('#return_selected').value = rbook.join(',');
+
+         } else {
+            rbook.splice(rbook.indexOf(rid), 1);
+            console.log("remove : ", rbook.join(','));
+            document.querySelector('#rbtn-' + rid).classList.add('btn-secondary');
+            document.querySelector('#rbtn-' + rid).classList.remove('btn-primary');
+            document.querySelector('#rbtn-' + rid).innerHTML = 'Select';
+            localStorage.setItem('rbook', JSON.stringify(rbook));
+            document.querySelector('#return_selected').value = rbook.join(',');
+         }
+      }
+   </script>
+
+   <script>
+      document.querySelector('#logout').addEventListener('click', (event) => {
+         console.log("clicked signOut");
+         localStorage.removeItem('books');
+         localStorage.removeItem('rbook');
+      })
+
+      document.querySelector('#bemailCheck').addEventListener('click', (event) => {
+         console.log("clicked email check");
+         localStorage.removeItem('books');
+      })
+
+      document.querySelector('#borrow_btn').addEventListener('click', (event) => {
+         if (books.length > 0) {
+            document.querySelector('#borrow_selected').value = books.join(',');
+            console.log("clicked borrow", books);
+         } else {
+            console.log('no books selected');
+            event.preventDefault();
+         }
+         localStorage.removeItem('books');
+      })
+
+      document.querySelector('#return_btn').addEventListener('click', (event) => {
+         if (rbook.length > 0) {
+            document.querySelector('#return_selected').value = rbook.join(',');
+            console.log("clicked return", rbook);
+         }else if (rbook.length == 0) {
+            console.log('no books selected');
+            event.preventDefault();
+         }
+         localStorage.removeItem('rbook');
       })
    </script>
 
