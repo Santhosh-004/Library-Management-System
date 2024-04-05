@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
       $phone = $_POST['phone'];
       $regno = strtoupper($_POST['regno']);
 
-      echo $fname . ' ' . $lname . ' ' . $email . ' password: ' . $password . ' confirm: ' . $cpassword . ' ' . $dob . ' ' . $gender . ' ' . $phone . ' ' . $regno;
+      //echo $fname . ' ' . $lname . ' ' . $email . ' password: ' . $password . ' confirm: ' . $cpassword . ' ' . $dob . ' ' . $gender . ' ' . $phone . ' ' . $regno;
 
       if ($password == $cpassword) {
          $year = date('Y', strtotime($dob));
@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
       }
 
       if ($passmatch && $agematch) {
-         $checker1 = "select count(register_no) from Users where register_no = '$regno' and email = '$email'";
+         $checker1 = "select count(register_no) from Users where register_no = '$regno' or email = '$email'";
          $cresult = $conn->query($checker1);
 
          // echo 'check ' . $cresult->fetch_row()[0];
@@ -140,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                      <label for="phone">Phone Number</label>
                      <input type="tel" id="phone" class="form-control" name="phone" minlength="10" required />
                   </div>
-                  <div class="labelInput textStart">
+                  <div class="labelInput textStart" style="height: 62px">
                      <label for="dob">Date of Birth</label>
                      <input type="date" id="dob" class="form-control" name="dob" required />
                   </div>

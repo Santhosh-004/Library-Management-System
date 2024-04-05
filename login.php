@@ -96,9 +96,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                </form>
                <div class="textStart mt-3">
                   <p>New User? <a href="register.html">Register here</a></p>
-                  <p>
-                     Forgot Password? <a href="forgot.html">Click here</a>
-                  </p>
+
                </div>
             </div>
          </div>
